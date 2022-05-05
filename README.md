@@ -2,5 +2,5 @@ SBNZ  - Aplikacija za preporuku unosa obroka i prepoznavanje vitaminskih deficit
 
 Spisak članova
 
-Slobodan Zelić SW5/2017
+Slobodan Zelić SW5/2017 Nikola Vujačić SW52/2017
 
