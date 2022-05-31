@@ -1,0 +1,23 @@
+template header
+min
+max
+
+package rules;
+
+import com.sbnz.ibar.model.*;
+
+import java.util.ArrayList;
+
+global ArrayList<Author> result;
+
+template "rating-search-interval"
+
+rule "Get authors by rating from @{min} to @{max} rating"
+
+    when
+        author : Author(averageRating >= @{min}, averageRating <= @{max})
+    then
+        result.add(author);
+    end
+
+    end template

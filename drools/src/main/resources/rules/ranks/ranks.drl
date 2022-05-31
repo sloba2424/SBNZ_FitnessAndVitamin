@@ -1,0 +1,123 @@
+package rules.ranks;
+
+import java.lang.String;
+import com.sbnz.ibar.rto.events.*;
+import com.sbnz.ibar.rto.*;
+import com.sbnz.ibar.model.*;
+
+import java.util.List;
+import java.time.temporal.ChronoUnit
+import java.time.Instant;
+import java.lang.Long;
+import java.lang.Double;
+import java.lang.Math;
+
+global com.sbnz.ibar.repositories.UserRepository userRepository;
+global com.sbnz.ibar.repositories.UserRepository userRepository;
+global java.lang.Long durationThreshold;
+global java.util.HashMap resultMap;
+
+rule "Add points for purchasing a plan for the first time"
+    lock-on-active
+    salience 10
+    when
+        $se: OnSubscribed($user: user, $plan: plan);
+
+        not(OnSubscribed(user.getId().equals($user.getId()), this before $se));
+        not(Reader(id.equals($user.getId())));
+    then
+        System.out.println("LOG -> FIRST PURCHASE NOT IN SYSTEM");
+        System.out.println("User acquired points " + $plan.getPrice() / 3);
+        $user.setPoints($user.getPoints() + $plan.getPrice() / 3);
+        insert($user);
+
+end
+
+rule "Add points for purchasing a new plan"
+    lock-on-active
+    salience 10
+    when
+        $se1: OnSubscribed($user: user, $plan: plan);
+        $se2: OnSubscribed(user.getId().equals($user.getId()), this before $se1);
+        eval(Math.abs(ChronoUnit.DAYS
+            .between(Instant.ofEpochMilli($se1.getTimestamp()), Instant.ofEpochMilli($se2.getTimestamp()))) < ($plan.getDayDuration() + durationThreshold))
+
+        not(Reader(id.equals($user.getId())));
+    then
+        System.out.println("LOG -> NEW PURCHASE NOT IN SYSTEM");
+        Double points = ($plan.getDayDuration() + durationThreshold - Math.abs(ChronoUnit.DAYS
+                                  .between(Instant.ofEpochMilli($se1.getTimestamp()), Instant.ofEpochMilli($se2.getTimestamp()))))
+                       * $plan.getPrice() / 4;
+        System.out.println("User acquired points " + points);
+        $user.setPoints($user.getPoints() + points);
+        insert($user);
+        delete($se2);
+
+end
+
+rule "Advance user rank"
+    salience 40
+
+    when
+        $reader: Reader($readerPoints: points, rank.getHigherRank() != null, $higherRank: rank.getHigherRank());
+        eval(($higherRank.getPoints() * 1.0) <= $readerPoints);
+    then
+        System.out.println("Old reader's points are " + $readerPoints);
+        System.out.println("Adequate rank is " + $higherRank.getName());
+        System.out.println("New reader's points are " + ($readerPoints - $higherRank.getPoints()));
+        $reader.setPoints($readerPoints - $higherRank.getPoints());
+        $reader.setRank($higherRank);
+        update($reader);
+end
+
+rule "User doesn't have enough points to advance"
+    salience 30
+
+    when
+        $reader: Reader($readerPoints: points, rank.getHigherRank() != null, $higherRank: rank.getHigherRank());
+        eval(($higherRank.getPoints() * 1.0) > $readerPoints);
+    then
+        System.out.println("User doesn't have enough points to advance");
+        userRepository.save($reader);
+        delete($reader);
+end
+
+rule "User has the largest possible rank"
+    salience 30
+
+    when
+        $reader: Reader(rank.getHigherRank() == null);
+
+    then
+        System.out.println("User has acquired the maximum possible rank.");
+        userRepository.save($reader);
+        delete($reader);
+end
+
+query lowerToHigher(Rank $lower, Rank $higher)
+    Rank(this == $lower, higherRank == $higher)
+    or
+    (Rank($middle: this, higherRank == $higher) and lowerToHigher($lower, $middle;))
+end
+
+rule "Check user rank"
+    when
+        $rcf: RankCheckFact($readerRank: reader.getRank(), $rank: rank);
+        lowerToHigher($rank, $readerRank;);
+    then
+        System.out.println("LOG -> CHECK USER RANK");
+        System.out.println($readerRank.getName() + " is higher than " + $rank.getName());
+        $rcf.setHigher(true);
+        delete($rcf);
+end
+
+rule "User rank is equal"
+    when
+        $rcf: RankCheckFact($readerRank: reader.getRank(), $rank: rank);
+        eval($readerRank == $rank);
+    then
+        System.out.println("LOG -> CHECK USER RANK");
+        System.out.println($readerRank.getName() + " is equal to " + $rank.getName());
+        $rcf.setHigher(true);
+        delete($rcf);
+end

@@ -1,0 +1,73 @@
+package rules.login;
+
+import java.lang.String;
+import com.sbnz.ibar.rto.events.OnLoggedIn;
+import com.sbnz.ibar.rto.events.OnSuspiciousEmail
+import com.sbnz.ibar.rto.events.OnSuspiciousIp;
+import com.sbnz.ibar.rto.EmailCheckFact;
+import com.sbnz.ibar.rto.IpCheckFact;
+
+
+rule "Unsuccessful login attempts - User account is suspicious"
+    when
+        $le: OnLoggedIn($user: user, user != null);
+        Number(intValue >= 5) from accumulate(
+			$ale: OnLoggedIn(user != null, user.getId() == $user.getId(), success == false) over window:time(2m), count($ale)
+		);
+		not(OnSuspiciousEmail(email.equals($user.getEmail())));
+    then
+    	System.out.println("LOG -> 5 UNSUCCESSFUL LOGIN ATTEMPTS FROM USER#" + $user.getId());
+    	insert(new OnSuspiciousEmail($user.getEmail()));
+end
+
+rule "Unsuccessful login attempts - IP is suspicious"
+    when
+        $le: OnLoggedIn($ipAddress: ipAddress);
+        Number(intValue >= 10) from accumulate(
+			$ale: OnLoggedIn(ipAddress == $ipAddress, success == false) over window:time(4m), count($ale)
+		);
+		not(OnSuspiciousIp(ipAddress.equals($ipAddress)));
+    then
+    	System.out.println("LOG -> 10 UNSUCCESSFUL LOGIN ATTEMPTS FROM IP#" + $ipAddress);
+    	insert(new OnSuspiciousIp($ipAddress));
+end
+
+rule "User account temporarily disabled"
+    when
+        $lcf: EmailCheckFact($email: userEmail);
+        OnSuspiciousEmail(email.equals($email));
+    then
+    	System.out.println("LOG -> USER TEMPORARILY BLOCKED " + $email);
+        $lcf.setAllowed(false);
+        delete($lcf);
+end
+
+rule "User account not disabled"
+    when
+        $lcf: EmailCheckFact($email: userEmail);
+        not(OnSuspiciousEmail(email.equals($email)));
+    then
+    	System.out.println("LOG -> USER NOT BLOCKED " + $email);
+        $lcf.setAllowed(true);
+        delete($lcf);
+end
+
+rule "IP temporarily blocked"
+    when
+        $lcf: IpCheckFact($ipAddress: ipAddress);
+        OnSuspiciousIp(ipAddress.equals($ipAddress));
+    then
+    	System.out.println("LOG -> IP TEMPORARILY BLOCKED " + $ipAddress);
+        $lcf.setAllowed(false);
+        delete($lcf);
+end
+
+rule "IP not blocked"
+    when
+        $lcf: IpCheckFact($ipAddress: ipAddress);
+        not(OnSuspiciousIp(ipAddress.equals($ipAddress)));
+    then
+    	System.out.println("LOG -> IP TEMPORARILY NOT BLOCKED " + $ipAddress);
+        $lcf.setAllowed(true);
+        delete($lcf);
+end

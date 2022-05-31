@@ -1,0 +1,23 @@
+template header
+min
+max
+
+package rules;
+
+import com.sbnz.ibar.model.*;
+
+import java.util.ArrayList;
+
+global ArrayList<Book> result;
+
+template "rating-search-interval"
+
+rule "Get books by rating from @{min} to @{max} rating"
+
+    when
+        $book : Book(averageRating >= @{min}, averageRating <= @{max})
+    then
+        result.add($book);
+    end
+
+    end template

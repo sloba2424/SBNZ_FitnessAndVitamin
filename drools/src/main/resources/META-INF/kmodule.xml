@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kmodule xmlns="http://jboss.org/kie/6.0.0/kmodule"
+			xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+	<kbase name="books" packages="rules.books">
+		<ksession name="books-session"/>
+	</kbase>
+	<kbase name="classify" packages="rules.classify">
+		<ksession name="classify-session"/>
+	</kbase>
+	<kbase name="login" eventProcessingMode="stream" packages="rules.login">
+		<ksession name="login-session"/>
+	</kbase>
+	<kbase name="reading" eventProcessingMode="stream" packages="rules.reading">
+		<ksession name="reading-session"/>
+	</kbase>
+	<kbase name="ranks" eventProcessingMode="stream" packages="rules.ranks">
+		<ksession name="ranks-session"/>
+	</kbase>
+</kmodule>

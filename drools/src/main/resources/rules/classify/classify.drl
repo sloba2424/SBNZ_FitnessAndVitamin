@@ -1,0 +1,28 @@
+package rules.classify;
+
+import java.lang.String;
+import com.sbnz.ibar.rto.*;
+import com.sbnz.ibar.model.*;
+
+global java.lang.Float bmi;
+global java.lang.Float bmr;
+global com.sbnz.ibar.repositories.UserRepository userRepository;
+rule "Classify user activity"
+    when
+        $user: User($bmi: bmi, $bmr: bmr);
+        $activity: Activity(bmi <= $bmi, bmi > $bmi);
+    then
+        $user.setUserActivity($activity.getName());
+        userRepository.save($user);
+        delete($user);
+end
+
+rule "Classify user level"
+    when
+        $user: User($bmi: bmi, $bmr: bmr);
+        $activity: Activity(bmr <= $bmr, bmr > $bmr);
+    then
+        $user.setUserLevel($level.getName());
+        userRepository.save($user);
+        delete($user);
+end

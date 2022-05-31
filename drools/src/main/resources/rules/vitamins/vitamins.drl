@@ -1,0 +1,89 @@
+package rules.reading;
+
+import java.lang.String;
+import com.sbnz.ibar.rto.events.*;
+import com.sbnz.ibar.model.Author;
+
+import java.util.List;
+
+global com.sbnz.ibar.repositories.UserRepository userRepository;
+
+rule "Disabling malicious user accounts where a new user targets one particular author - low rating"
+    when
+        $se: OnSubscribed($user: user, user.isEnabled()) over window:time(72h);
+        $re: OnReview(
+            review.getReader().getId().equals($user.getId()),
+            review.getRating() <= 2,
+            $review: review,
+            $authors: review.getBook().getAuthors(),
+            this after $se
+        );
+        $author: Author() from $authors;
+        // not necessary in this particular rule
+        not (
+            OnReview(
+                review.getReader().getId().equals($user.getId()),
+                review.getRating() <= 2,
+                $author memberOf review.getBook().getAuthors(),
+                this after $se,
+                this after $re
+            )
+        );
+        Number(intValue > 7) from accumulate (
+            $are: OnReview(
+                review.getReader().getId().equals($user.getId()),
+                review.getRating() <= 2,
+                $author memberOf review.getBook().getAuthors(),
+                this after $se
+            ),
+            count($are)
+        )
+    then
+        System.out.printf(
+                "LOG -> USER ACCOUNT %s DISABLED AFTER TOO MANY LOW RATED REVIEWS POSTED AGAINST ONE AUTHOR %s",
+                 $user.getId(),
+                 $author.getId());
+        $user.setEnabled(false);
+        userRepository.save($user);
+        update($se);
+end
+
+rule "Disabling malicious user accounts where a new user targets one particular author - highest rating"
+    when
+        $se: OnSubscribed($user: user, user.isEnabled()) over window:time(72h);
+        $re: OnReview(
+            review.getReader().getId().equals($user.getId()),
+            review.getRating() == 5,
+            $review: review,
+            $authors: review.getBook().getAuthors(),
+            this after $se
+        );
+        $author: Author() from $authors;
+        // not necessary in this particular rule
+        not (
+            OnReview(
+                review.getReader().getId().equals($user.getId()),
+                review.getRating() == 5,
+                $author memberOf review.getBook().getAuthors(),
+                this after $se,
+                this after $re
+            )
+        );
+        Number(intValue > 7) from accumulate (
+            $are: OnReview(
+                review.getReader().getId().equals($user.getId()),
+                review.getRating() == 5,
+                $author memberOf review.getBook().getAuthors(),
+                this after $se
+            ),
+            count($are)
+        )
+    then
+        System.out.printf(
+                "LOG -> USER ACCOUNT %s DISABLED AFTER TOO MANY HIGH RATED REVIEWS POSTED FOR ONE AUTHOR %s",
+                 $user.getId(),
+                 $author.getId());
+        $user.setEnabled(false);
+        update($se);
+        userRepository.save($user);
+end
